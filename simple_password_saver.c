@@ -18,13 +18,8 @@ static_assert(AES_BLOCKLEN == 16, "Bad AES library");
 static_assert(SHA1_DIGEST_BYTE_LENGTH == 20, "Bad SHA1 library");
 #define MAX_PASSWORD_LENGTH 512
 
-// Home-relative; basically "~"$PASSWORDS_DIRECTORY
+// Home directory-relative
 #define PASSWORDS_DIRECTORY "passwords"
-
-/*
-TODOs:
-    Add local home storage so it will be easier to add/set/get passwords.
-*/
 
 typedef struct { // AES Encrypted
     uint8_t hash[20];   // SHA1 hash of the data.
@@ -160,7 +155,7 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    // Modifying argv might look illegal, but it is in our memory, so everything is legal.
+    // Modifying argv might look illegal, but it is in our memory, hence everything is legal.
     for (char *it = argv[2]; *it; ++it) {
         if (*it == '/') {
             *it = '\\';
@@ -236,7 +231,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to alloc memory: %s\n", strerror(errno));
             return 1;
         }
-        fprintf(stderr, "Enter secret you want to save(press ^D to finish)\n");
+        fprintf(stderr, "Enter secret you want to save(press ^D^D to finish)\n"); // XXXXX: Why do we need to press ^D twice??!
         term.c_lflag &= ~(ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &term);
         for (;;) {
@@ -253,7 +248,7 @@ int main(int argc, char **argv) {
                 }
             }
             else if (size == 0) {
-                break; // We probably read everything.
+                break; // We've probably done reading everything.
             }
         }
         term.c_lflag = original_term_c_lflag;
@@ -262,7 +257,7 @@ int main(int argc, char **argv) {
         size_t count_aligned = count+16-(count&15);
         Secret *secret = malloc(sizeof(Secret)+count_aligned);
         memcpy(secret->data, data, count);
-        memset(secret->data+count, 69, count_aligned-count); // TODO: Maybe fill padding with random bytes.
+        memset(secret->data+count, 69, count_aligned-count); // TODO: Maybe fill padding with random garbage.
         sha1_digest(secret->data, count, secret->hash);
         secret->size = count;
         secret->file_size = count_aligned;

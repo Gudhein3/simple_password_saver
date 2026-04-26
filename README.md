@@ -22,7 +22,7 @@ Create a secret:
 $ sps encrypt accounts.ѕыҏ.co
 >> Please, enter your master password
 << DomShorthair2018^
->> Enter secret you want to save(press ^D to finish)
+>> Enter secret you want to save(press ^D^D to finish)
 << I7B1ov8]ioo_L!ZkI^#Z&qLAh!y40ax7
 << ^D^D
 ```
