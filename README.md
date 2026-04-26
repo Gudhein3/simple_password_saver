@@ -1,11 +1,9 @@
-# Simple Password Saver
-# A simple way to manage your secrets
-
+# Program
 ## Compilation
 ```shell
 $ make
 ```
-What did you expect to see here else?
+What else did you expect to see here?
 
 ## Installation
 ```shell
