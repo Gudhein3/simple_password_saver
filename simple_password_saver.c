@@ -27,6 +27,29 @@ typedef struct { // AES Encrypted
     uint64_t file_size; // Including panding
     uint8_t data[];
 } __attribute__((packed)) Secret;
+struct termios term;
+int original_term_c_lflag;
+
+
+void get_lepasswd(char password[MAX_PASSWORD_LENGTH+1], const char *prompt) {
+    term.c_lflag &= ~(ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
+    fprintf(stderr, "%s", prompt);
+    {
+        int i;
+        for (i = 0;; ++i) { // Consuming all pending characters, so our customer wouldn't accidentally show their password when they entered too many characters. TODO: Explain it better in the code.
+            char ch = getchar();
+            if (i < MAX_PASSWORD_LENGTH) {
+                password[i] = ch;
+            }
+            if (ch == '\n' || ch == EOF) break;
+        }
+        password[i] = 0;
+    }
+
+    term.c_lflag = original_term_c_lflag;
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
+}
 
 void encrypt(const char *key, uint8_t *data, size_t size) {
     assert(size % AES_BLOCKLEN == 0 && "Size of data should be divisible by 16");
@@ -53,10 +76,11 @@ void decrypt(const char *key, uint8_t *data, size_t size) {
 void usage(const char *program_name) {
     fprintf(stderr, "Usage: %s ACTION secret's-name\n"
                     "\tactions:\n"
-                    "\t  decrypt - Decrypt the secret\n"
-                    "\t  encrypt - Encrypt the secret\n"
-                    "\t  remove - Remove the secret\n"
-                    "\t  list   - List all saved secrets\n", program_name);
+                    "\t  decrypt   - Decrypt the secret\n"
+                    "\t  encrypt   - Encrypt the secret\n"
+                    "\t  recrypt  - Reëncrypt the secret\n"
+                    "\t  remove    - Remove the secret\n"
+                    "\t  list      - List all saved secrets\n", program_name);
 }
 
 char current_directory[4096]; // 4096 characters in an absolute path should be enough for everybody.
@@ -110,6 +134,7 @@ int main(int argc, char **argv) {
     enum {
         Decrypt,
         Encrypt,
+        Recrypt,
         Remove
     } action;
     if (strcmp(argv[1], "encrypt") == 0) {
@@ -127,6 +152,14 @@ int main(int argc, char **argv) {
             return 2;
         }
         action = Decrypt;
+    }
+    else if (strcmp(argv[1], "recrypt") == 0) {
+        if (argc != 3) {
+            usage(argv[0]);
+            fprintf(stderr, "Expected secret's name\n");
+            return 2;
+        }
+        action = Recrypt;
     }
     else if (strcmp(argv[1], "remove") == 0) {
         if (argc != 3) {
@@ -181,31 +214,13 @@ int main(int argc, char **argv) {
         }
         return 0;
     }
-
-    char password[MAX_PASSWORD_LENGTH+1];
-    struct termios term;
     tcgetattr(STDIN_FILENO, &term);
-    int original_term_c_lflag = term.c_lflag;
-    term.c_lflag &= ~(ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &term);
-    fprintf(stderr, "Please, enter your master password\n");
-    {
-        int i;
-        for (i = 0;; ++i) { // Consuming all pending characters, so user wouldn't accidentally show them
-            char ch = getchar();
-            if (i < MAX_PASSWORD_LENGTH) {
-                password[i] = ch;
-            }
-            if (ch == '\n' || ch == EOF) break;
-        }
-        password[i] = 0;
-    }
+    original_term_c_lflag = term.c_lflag;
 
-    term.c_lflag = original_term_c_lflag;
-    tcsetattr(STDIN_FILENO, TCSANOW, &term);
 
     if (action == Encrypt) {
-
+        char password[MAX_PASSWORD_LENGTH+1];
+        get_lepasswd(password, "Please, enter your master password\n");
         FILE *output_file = fopen(argv[2], "rb");
         if (output_file) {
             fclose(output_file);
@@ -266,6 +281,8 @@ int main(int argc, char **argv) {
         fwrite(secret, 1, sizeof(Secret)+count_aligned, output_file);
     }
     else if (action == Decrypt) {
+        char password[MAX_PASSWORD_LENGTH+1];
+        get_lepasswd(password, "Please, enter your master password\n");
         FILE *input_file = fopen(argv[2], "rb");
         if (!input_file) {
             fprintf(stderr, "Failed to open file: %s: %s\n", argv[2], strerror(errno));
@@ -286,6 +303,33 @@ int main(int argc, char **argv) {
             return 1;
         }
         fwrite(secret->data, 1, secret->size, stdout);
+    }
+    else if (action == Recrypt) {
+        char password[MAX_PASSWORD_LENGTH+1];
+        get_lepasswd(password, "Please, enter your old master password\n");
+        FILE *the_file = fopen(argv[2], "r+b");
+        if (!the_file) {
+            fprintf(stderr, "Failed to open file: %s: %s\n", argv[2], strerror(errno));
+            return 2;
+        }
+
+        fseek(the_file, 0, SEEK_END);
+        size_t the_size = ftell(the_file);
+        fseek(the_file, 0, SEEK_SET);
+        Secret *secret = malloc(the_size);
+        fread(secret, 1, the_size, the_file);
+
+        decrypt(password, secret->data, secret->file_size);
+        uint8_t hash[20];
+        sha1_digest(secret->data, secret->size, hash);
+        if (memcmp(secret->hash, hash, 20) != 0) {
+            fprintf(stderr, "Invalid password\n");
+            return 1;
+        }
+        get_lepasswd(password, "Please, enter your new master password\n");
+        encrypt(password, secret->data, secret->file_size);
+        fseek(the_file, 0, SEEK_SET);
+        fwrite(secret, 1, the_size, the_file);
     }
     else {
         assert(0 && "Unreachable");
