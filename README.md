@@ -23,18 +23,32 @@ Create a secret:
 ```shell
 $ sps encrypt accounts.ѕыҏ.co
 >> Please, enter your master password
-<< DomShorthair2018^
+<<< DomShorthair2018^
 >> Enter secret you want to save(press ^D^D to finish)
-<< I7B1ov8]ioo_L!ZkI^#Z&qLAh!y40ax7
-<< ^D^D
+<<< I7B1ov8]ioo_L!ZkI^#Z&qLAh!y40ax7
+<<< ^D^D
 ```
 
 Read a secret:
 ```shell
 $ sps decrypt accounts.ѕыҏ.co
 >> Please, enter your master password
-<< DomShorthair2018^
+<<< DomShorthair2018^
 >> I7B1ov8]ioo_L!ZkI^#Z&qLAh!y40ax7
+```
+
+Reëncrypt a secret:
+```shell
+$ sps recrypt accounts.ѕыҏ.co
+>> Please, enter your old master password
+<<< DomShorthair2018^
+>> Please, enter your new master password
+<<< Hilbert1936
+$ sps decrypt accounts.ѕыҏ.co
+>> Please, enter your master password
+<<< Hilbert1936
+>> I7B1ov8]ioo_L!ZkI^#Z&qLAh!y40ax7
+$
 ```
 
 List secrets:
@@ -44,11 +58,12 @@ $ sps list
 . very-good-pancake-recipe
 . gpg-private-key
 . plans-on-2026!04!26
+. Ko3-uhohdvh-gdwh
 ```
 
 Remove a secret:
 ```shell
 $ sps remove plans-on-2026!04!26
 >> Do You REALLY WANT to REMOVE THE SECRET? Type 49406 if so
-<< 49406
+<<< 49406
 ```
