@@ -14,11 +14,8 @@ Or
 # make global_install # Installs to /usr/bin/sps
 ```
 
-## Disclaimer
-* All passwords shown in this demonstration as far as I know don't belong to any person and shown here for demonstration purposes only.
-* This program doesn't actually provide enough any warranties that it cannot be decrypted without knowing the master password. however it's literally described in the terms of the MIT license, I want to make it clear for everybody
-
 ## Usage
+### TBD: Update examples
 Create a secret:
 ```shell
 $ sps encrypt accounts.ѕыҏ.co
