@@ -1,0 +1,2 @@
+#0 - Fix the issue #1, which's caused by storing unencrypted vulnerable SHA1 of secret data;
+     And introduce patch control system.
