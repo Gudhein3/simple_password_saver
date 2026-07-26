@@ -105,7 +105,7 @@ int are_you_sure(const char *prompt) {
     fprintf(stderr, "%s Type %d and press enter if so\n", prompt, x);
     char buf[7/*To make sure it 100% won't overfill*/] = {0};
     char buf2[7] = {0};
-    snprintf(buf, 6, "%d", x);
+    snprintf(buf, sizeof(buf), "%d", x);
     readline(buf2, sizeof(buf2));
     return strcmp(buf, buf2) == 0;
 }
@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
         }
 
         if (fwrite(secret, 1, the_size, the_file) != the_size) {
-            perror("Read file");
+            perror("Write file");
             abort();
         }
 
@@ -452,7 +452,7 @@ int main(int argc, char **argv) {
         size_t count_aligned = count+16-(count&15);
         Secret *secret = malloc(sizeof(Secret)+count_aligned);
         malloc_check(secret);
-        secret->patch = 0;
+        secret->patch = CURRENT_PATCH;
         memcpy(secret->data, data, count);
         memset(secret->data+count, 69, count_aligned-count); // Password validation code.
         secret->size = count;
