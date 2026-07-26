@@ -43,7 +43,7 @@ typedef struct {
 
 void fall_iff(int cond, const char *message) {
     if (!cond) {
-        fprintf(stderr, message);
+        fprintf(stderr, "%s", message);
         abort();
     }
 }
@@ -84,8 +84,7 @@ void get_lepasswd(char password[MAX_PASSWORD_LENGTH+1], const char *prompt) {
 }
 
 // I haven't found any libc-native solutions.
-void readline(size_t size;
-              char buffer[size], size_t size) {
+void readline(char *buffer, size_t size) {
     size_t i;
     for (i = 0; i < size-1; ++i) {
         char c;
@@ -149,7 +148,7 @@ void verify_secret(Secret *secret) {
         exit(1);
     }
 
-    int corruption_level = (secret->file_size != secret->size+16-(secret->size&15)<<0);
+    int corruption_level = ((secret->file_size != secret->size+16-(secret->size&15))<<0);
 
     if (corruption_level != 0) {
         fprintf(stderr, "Sorry, your secret file seems to be corrupted with corruption code 0o%o.\n"
@@ -464,7 +463,6 @@ int main(int argc, char **argv) {
         decrypt(password, secret->data, secret->file_size);
         verify_secret(secret);
 
-        uint8_t hash[20];
         fwrite(secret->data, 1, secret->size, stdout);
     }
     else if (action == Recrypt) {
