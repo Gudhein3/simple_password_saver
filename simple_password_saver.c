@@ -24,7 +24,7 @@ static_assert(SHA1_DIGEST_BYTE_LENGTH == 20, "Bad SHA1 library");
 // Home directory-relative
 #define PASSWORDS_DIRECTORY "passwords"
 
-#define malloc_check(ptr) do {fall_iff((ptr) != NULL, "Buy more RAM lol");} while(0)
+#define malloc_check(ptr) do {if((ptr) == NULL) {perror("Failed to allocate memory"); abort();}} while(0)
 
 typedef struct {
     uint8_t patch;      // Lastest patch applied
@@ -55,11 +55,15 @@ void get_lepasswd_base(char password[MAX_PASSWORD_LENGTH+1]) {
     term.c_lflag &= ~(ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &term);
     {
-        int i;
-        for (i = 0;; ++i) {
-            char ch = getchar();
-            if (i < MAX_PASSWORD_LENGTH) {
+        int i = 0;
+        for(;;) {
+            int ch = getchar();
+            if (i < MAX_PASSWORD_LENGTH) { // This is not gonna overflow;
+                                           // Writing at `password[i]` only happens when the expression `i < MAX_PASSWORD_LENGTH` is true,
+                                           // and, as seen above, the variable `password` is forced to be `MAX_PASSWORD + 1` elements big.
+                                           // Therefore, `i < sizeof(password)` will always be true. Qed.
                 password[i] = ch;
+                ++i;
             }
             if (ch == '\n' || ch == EOF) break;
         }
@@ -142,7 +146,8 @@ void usage(const char *program_name) {
 
 char current_directory[4096]; // 4096 characters in an absolute path should be enough for everybody.
 
-void verify_secret(Secret *secret) {
+/// WARNING: THIS PROCEDURE ALSO DECRYPTS PROVIDED SECRET.
+void verify_secret(Secret *secret, const char *password) {
     if (secret->patch > CURRENT_PATCH) {
         fprintf(stderr, "Aborted: the file has #%d patch, while the manager supports only #%d\n", secret->patch, CURRENT_PATCH);
         exit(1);
@@ -156,6 +161,8 @@ void verify_secret(Secret *secret) {
                         "Or you forgot to apply some patches :)", corruption_level);
         exit(1);
     }
+
+    decrypt(password, secret->data, secret->file_size);
 
     for (size_t i = secret->size; i < secret->file_size; ++i) {
         if (secret->data[i] != 69) {
@@ -326,7 +333,10 @@ int main(int argc, char **argv) {
         fseek(the_file, 19, SEEK_SET);
         Secret *secret = malloc(the_size);
         malloc_check(secret);
-        fread(secret, 1, the_size, the_file);
+        if (fread(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
         secret->patch = 0;
 
         fclose(the_file);
@@ -335,7 +345,11 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to open file: %s: %s\n", argv[2], strerror(errno));
             return 2;
         }
-        fwrite(secret, 1, the_size, the_file);
+
+        if (fwrite(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
 
         return 0;
     }
@@ -353,7 +367,10 @@ int main(int argc, char **argv) {
         fseek(the_file, 19, SEEK_SET);
         Secret *secret = malloc(the_size);
         malloc_check(secret);
-        fread(secret, 1, the_size, the_file);
+        if (fread(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
 
         if (secret->patch == CURRENT_PATCH) {
             fprintf(stderr, "Aborted: already patched on #%d\n", CURRENT_PATCH);
@@ -375,7 +392,11 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to open file: %s: %s\n", argv[2], strerror(errno));
             return 2;
         }
-        fwrite(secret, 1, the_size, the_file);
+        if (fwrite(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
+
 
         return 0;
     }
@@ -405,10 +426,6 @@ int main(int argc, char **argv) {
         size_t count = 0;
         uint8_t *data = malloc(capacity);
         malloc_check(data);
-        if (!data) {
-            fprintf(stderr, "Failed to alloc memory: %s\n", strerror(errno));
-            return 1;
-        }
         fprintf(stderr, "Enter secret you want to save(press ^D^D to finish)\n"); // XXXXX: Why do we need to press ^D twice??!
         term.c_lflag &= ~(ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &term);
@@ -442,7 +459,11 @@ int main(int argc, char **argv) {
         secret->file_size = count_aligned;
 
         encrypt(password, secret->data, secret->file_size);
-        fwrite(secret, 1, sizeof(Secret)+count_aligned, output_file);
+        if (fwrite(secret, 1, sizeof(Secret)+count_aligned, output_file) != sizeof(Secret)+count_aligned) {
+            perror("Read file");
+            abort();
+        }
+
     }
     else if (action == Decrypt) {
         char password[MAX_PASSWORD_LENGTH+1];
@@ -459,9 +480,11 @@ int main(int argc, char **argv) {
         fseek(input_file, 0, SEEK_SET);
         Secret *secret = malloc(input_size);
         malloc_check(secret);
-        fread(secret, 1, input_size, input_file);
-        decrypt(password, secret->data, secret->file_size);
-        verify_secret(secret);
+        if (fread(secret, 1, input_size, input_file) != input_size) {
+            perror("Read file");
+            abort();
+        }
+        verify_secret(secret, password);
 
         fwrite(secret->data, 1, secret->size, stdout);
     }
@@ -480,16 +503,21 @@ int main(int argc, char **argv) {
         fseek(the_file, 0, SEEK_SET);
         Secret *secret = malloc(the_size);
         malloc_check(secret);
-        fread(secret, 1, the_size, the_file);
+        if (fread(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
 
-        decrypt(password, secret->data, secret->file_size);
-        verify_secret(secret);
+        verify_secret(secret, password);
 
         fprintf(stderr, "Please, enter your new master password\n");
         get_lepasswd_base(password);
         encrypt(password, secret->data, secret->file_size);
         fseek(the_file, 0, SEEK_SET);
-        fwrite(secret, 1, the_size, the_file);
+        if (fwrite(secret, 1, the_size, the_file) != the_size) {
+            perror("Read file");
+            abort();
+        }
     }
     else {
         assert(0 && "Unreachable");
